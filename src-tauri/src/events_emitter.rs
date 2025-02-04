@@ -20,7 +20,7 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use log::error;
+use log::{error, info};
 use serde::Serialize;
 use tari_common_types::tari_address::TariAddress;
 use tauri::{AppHandle, Emitter};
@@ -160,6 +160,7 @@ impl EventsEmitter {
                 balance,
             },
         };
+        info!(target: LOG_TARGET, "DEBUG: Emitting NewBlockHeight with event: {:?}", event.clone());
         if let Err(e) = app_handle.emit(BACKEND_STATE_UPDATE, event) {
             error!(target: LOG_TARGET, "Failed to emit NewBlockHeight event: {:?}", e);
         }

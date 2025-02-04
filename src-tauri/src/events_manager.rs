@@ -20,7 +20,7 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use log::error;
+use log::{error, info};
 use tari_core::transactions::tari_amount::MicroMinotari;
 use tauri::{AppHandle, Manager};
 use tokio::sync::watch::Receiver;
@@ -79,20 +79,27 @@ impl EventsManager {
         let app_clone = app.clone();
         let events_service = self.events_service.clone();
         tokio::spawn(async move {
+            info!(target: LOG_TARGET, "DEBUG:=== handle_new_block_height for: {:?} ===", block_height);
             match events_service.wait_for_wallet_scan(block_height, 20).await {
                 Ok(scanned_wallet_state) => match scanned_wallet_state.balance {
                     Some(balance) => {
-                        let coinbase_tx =
-                            if balance.pending_incoming_balance.gt(&MicroMinotari::zero()) {
-                                events_service
-                                    .get_coinbase_transaction_for_last_mined_block(
-                                        &app_clone.state::<UniverseAppState>().wallet_manager,
-                                        block_height,
-                                    )
-                                    .await
-                            } else {
-                                None
-                            };
+                        info!(target: LOG_TARGET, "DEBUG: Wallet scan completed successfully for block height #{}, found balance: {:?}", block_height, balance);
+                        let coinbase_tx = if balance
+                            .pending_incoming_balance
+                            .gt(&MicroMinotari::zero())
+                        {
+                            info!(target: LOG_TARGET, "DEBUG: Detected pending incoming balance, checking for coinbase transaction at height #{}", block_height);
+                            events_service
+                                .get_coinbase_transaction_for_last_mined_block(
+                                    &app_clone.state::<UniverseAppState>().wallet_manager,
+                                    block_height,
+                                )
+                                .await
+                        } else {
+                            info!(target: LOG_TARGET, "DEBUG: No pending incoming balance detected at height #{}", block_height);
+                            None
+                        };
+                        info!(target: LOG_TARGET, "DEBUG: Emitting new block mined event for height #{} with coinbase_tx: {:?}", block_height, coinbase_tx);
                         EventsEmitter::emit_new_block_mined(
                             &app_clone,
                             block_height,

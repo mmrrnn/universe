@@ -20,7 +20,7 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use log::{error, warn};
+use log::{error, info, warn};
 use std::sync::Arc;
 
 use crate::{
@@ -50,23 +50,32 @@ impl EventsService {
     ) -> Result<WalletState, anyhow::Error> {
         let mut retries = 0;
         let mut wallet_state_watch_rx = (*self.wallet_state_watch_rx).clone();
+        info!(target: LOG_TARGET, "Starting wallet scan wait loop. Target block height: {:?}, Retry limit: {:?}", block_height, retries_limit);
         loop {
             if wallet_state_watch_rx.changed().await.is_err() {
                 error!(target: LOG_TARGET, "Failed to receive wallet_state_watch_rx");
                 break;
             }
             if let Some(wallet_state) = wallet_state_watch_rx.borrow().clone() {
+                info!(target: LOG_TARGET, "Current scan height: {:?}, Target height: {:?}, Retries: {:?}/{:?}",
+                    wallet_state.scanned_height, block_height, retries, retries_limit);
+
                 if wallet_state.scanned_height >= block_height {
+                    info!(target: LOG_TARGET, "Scan completed successfully at height {:?}", wallet_state.scanned_height);
                     return Ok(wallet_state);
                 }
 
                 if wallet_state.scanned_height == 0 && retries > 2 {
                     warn!(target: LOG_TARGET, "Initial wallet scan completed before the wallet grpc server started");
+                    info!(target: LOG_TARGET, "Returning early with scan height 0 after {:?} retries", retries);
                     return Ok(wallet_state);
                 }
+            } else {
+                info!(target: LOG_TARGET, "No wallet state available on attempt {:?}/{:?}", retries + 1, retries_limit);
             }
             retries += 1;
             if retries >= retries_limit {
+                info!(target: LOG_TARGET, "Reached retry limit of {:?} attempts", retries_limit);
                 break;
             }
         }
@@ -84,11 +93,18 @@ impl EventsService {
             .get_coinbase_transactions(false, Some(10))
             .await
         {
-            Ok(txs) => txs
-                .into_iter()
-                .find(|tx| tx.mined_in_block_height == current_block_height),
+            Ok(txs) => {
+                info!(target: LOG_TARGET, "DEBUG: Retrieved {} coinbase transactions, looking for block height {}", txs.len(), current_block_height);
+                info!(target: LOG_TARGET, "DEBUG: Latest coinbase transaction: {:?}", txs[0]);
+                let result = txs
+                    .into_iter()
+                    .find(|tx| tx.mined_in_block_height == current_block_height);
+                info!(target: LOG_TARGET, "DEBUG: Found coinbase transaction for block {}: {}", current_block_height, result.is_some());
+                result
+            }
             Err(e) => {
                 error!(target: LOG_TARGET, "Failed to get latest coinbase transaction: {:?}", e);
+                info!(target: LOG_TARGET, "DEBUG: Current block height was {} when failure occurred", current_block_height);
                 None
             }
         }
