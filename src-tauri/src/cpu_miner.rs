@@ -41,6 +41,8 @@ use tokio::time::{sleep, timeout};
 const LOG_TARGET: &str = "tari::universe::cpu_miner";
 const ECO_MODE_CPU_USAGE: u32 = 30;
 
+const LOCK_TIMEOUT: Duration = Duration::from_secs(10);
+
 pub(crate) struct CpuMiner {
     watcher: Arc<RwLock<ProcessWatcher<XmrigAdapter>>>,
 }
@@ -105,7 +107,15 @@ impl CpuMiner {
             MiningMode::Ludicrous => None,
         };
         {
-            let mut lock = self.watcher.write().await;
+            let mut lock = match timeout(LOCK_TIMEOUT, self.watcher.write()).await {
+                Ok(lock) => lock,
+                Err(_) => {
+                    error!(target: LOG_TARGET, "Deadlock detected while acquiring write lock in CpuMiner::start");
+                    return Err(anyhow::anyhow!(
+                        "Deadlock detected while starting CPU miner"
+                    ));
+                }
+            };
             lock.adapter.node_connection = Some(xmrig_node_connection);
             lock.adapter.monero_address = Some(monero_address.clone());
             lock.adapter.cpu_threads = Some(cpu_max_percentage);
@@ -144,7 +154,15 @@ impl CpuMiner {
         };
 
         {
-            let mut lock = self.watcher.write().await;
+            let mut lock = match timeout(LOCK_TIMEOUT, self.watcher.write()).await {
+                Ok(lock) => lock,
+                Err(_) => {
+                    error!(target: LOG_TARGET, "Deadlock detected while acquiring write lock in CpuMiner::start_benchmarking");
+                    return Err(anyhow::anyhow!(
+                        "Deadlock detected while starting CPU miner benchmark"
+                    ));
+                }
+            };
             lock.adapter.node_connection = Some(XmrigNodeConnection::Benchmark);
             lock.adapter.monero_address = Some("44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A".to_string());
             lock.adapter.cpu_threads = Some(Some(1));
@@ -223,8 +241,22 @@ impl CpuMiner {
     }
 
     pub async fn stop(&mut self) -> Result<(), anyhow::Error> {
-        let mut lock = self.watcher.write().await;
-        lock.stop().await?;
+        let mut lock = match timeout(LOCK_TIMEOUT, self.watcher.write()).await {
+            Ok(lock) => lock,
+            Err(_) => {
+                error!(target: LOG_TARGET, "Deadlock detected while acquiring write lock in CpuMiner::stop");
+                return Err(anyhow::anyhow!(
+                    "Deadlock detected while stopping CPU miner"
+                ));
+            }
+        };
+        match timeout(LOCK_TIMEOUT, lock.stop()).await {
+            Ok(result) => result?,
+            Err(_) => {
+                error!(target: LOG_TARGET, "Deadlock detected while stopping CPU miner process");
+                return Err(anyhow::anyhow!("Deadlock detected during CPU miner shutdown"));
+            }
+        };
         Ok(())
     }
 

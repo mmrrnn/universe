@@ -55,11 +55,13 @@ use std::thread::{available_parallelism, sleep};
 use std::time::{Duration, Instant, SystemTime};
 use tari_common::configuration::Network;
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize};
-use tokio::time;
+use tokio::time::{self, timeout};
 
 const MAX_ACCEPTABLE_COMMAND_TIME: Duration = Duration::from_secs(1);
 const LOG_TARGET: &str = "tari::universe::commands";
 const LOG_TARGET_WEB: &str = "tari::universe::web";
+
+const LOCK_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Serialize, Clone)]
 pub struct MaxUsageLevels {
@@ -1428,7 +1430,13 @@ pub async fn start_mining<'r>(
             .map_err(|e| e.to_string())?;
 
         {
-            let mut cpu_miner = state.cpu_miner.write().await;
+            let mut cpu_miner =  match timeout(LOCK_TIMEOUT, state.cpu_miner.write()).await {
+                            Ok(miner) => miner,
+                            Err(_) => {
+                                error!(target: LOG_TARGET, "Deadlock detected while acquiring CPU miner write lock");
+                                return Err("Mining start failed: Deadlock on CPU miner write lock".to_string());
+                            }
+                        };
             let res = cpu_miner
                 .start(
                     state.shutdown.to_signal(),
