@@ -1335,12 +1335,14 @@ fn main() {
                     .inspect_err(|e| error!(target: LOG_TARGET, "Could not setup app: {:?}", e));
             });
         }
-        tauri::RunEvent::ExitRequested { api: _, .. } => {
+        tauri::RunEvent::ExitRequested { api: _, code, .. } => {
+            info!("XXXXXXXXXXXXX ExitRequested with code: {:#?}", code);
             info!(target: LOG_TARGET, "App shutdown request caught");
             let _unused = block_on(stop_all_processes(app_handle.clone(), true));
             info!(target: LOG_TARGET, "App shutdown complete");
         }
         tauri::RunEvent::Exit => {
+            info!("XXXXXXXXXXXXX Exit");
             info!(target: LOG_TARGET, "App shutdown caught");
             let _unused = block_on(stop_all_processes(app_handle.clone(), true));
             info!(target: LOG_TARGET, "Tari Universe v{} shut down successfully", app_handle.package_info().version);

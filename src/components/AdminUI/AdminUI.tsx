@@ -7,6 +7,7 @@ import { DialogsGroup } from './groups/DialogsGroup';
 import { GreenModalsGroup } from './groups/GreenModalsGroup';
 import { ToastsGroup } from './groups/ToastsGroup';
 import { OtherUIGroup } from './groups/OtherUIGroup';
+import { EventsGroup } from './groups/EventsGroup';
 import { AnimatePresence } from 'motion/react';
 
 const AdminUI = memo(function AdminUI() {
@@ -36,6 +37,7 @@ const AdminUI = memo(function AdminUI() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 10 }}
                         >
+                            <EventsGroup />
                             <ThemeGroup />
                             <DialogsGroup />
                             <GreenModalsGroup />

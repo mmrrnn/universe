@@ -32,7 +32,7 @@ const FloatingElements = memo(function FloatingElements() {
             <ToastStack />
             <CriticalProblemDialog />
             <ReleaseNotesDialog />
-            {environment === 'development' && <AdminUI />}
+            <AdminUI />
         </FloatingTree>
     );
 });
