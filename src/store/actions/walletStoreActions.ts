@@ -20,14 +20,14 @@ export const fetchTransactionsHistory = async ({ continuation, limit }: TxArgs) 
         useWalletStore.setState({ is_transactions_history_loading: true });
         const currentTxs = useWalletStore.getState().transactions;
         const fetchedTxs = await invoke('get_transactions_history', { continuation, limit });
-
         const transactions = continuation ? [...currentTxs, ...fetchedTxs] : fetchedTxs;
+        const sorted = transactions.sort((a, b) => b.timestamp - a.timestamp);
         const has_more_transactions = fetchedTxs.length > 0 && (!limit || fetchedTxs.length === limit);
         useWalletStore.setState({
             has_more_transactions,
-            transactions,
+            transactions: sorted,
         });
-        return transactions;
+        return sorted;
     } catch (error) {
         if (error !== ALREADY_FETCHING.HISTORY) {
             console.error('Could not get transaction history: ', error);

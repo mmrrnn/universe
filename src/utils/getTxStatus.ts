@@ -24,7 +24,12 @@ const txStates = {
         TransactionStatus.OneSidedUnconfirmed,
     ],
     failed: [TransactionStatus.Rejected, TransactionStatus.NotFound, TransactionStatus.CoinbaseNotInBlockChain],
-    complete: [TransactionStatus.Imported, TransactionStatus.OneSidedConfirmed, ...txTypes.mined],
+    complete: [
+        TransactionStatus.Imported,
+        TransactionStatus.OneSidedConfirmed,
+        TransactionStatus.MinedConfirmed,
+        ...txTypes.mined,
+    ],
 };
 
 export function getTxTypeByStatus(transaction: TransactionInfo): TransationType {
@@ -56,10 +61,9 @@ export function getTxTitle(transaction: TransactionInfo): string {
         return `${i18n.t('sidebar:block')} #${transaction.mined_in_block_height}`;
     }
 
+    console.debug(txMessage, transaction.status, statusTitleKey, statusTitle);
+
     if (txMessage && !txMessage.includes('<No message>')) {
-        if (statusTitleKey !== 'complete') {
-            return `${txMessage} | ${statusTitle}`;
-        }
         return txMessage;
     }
 
